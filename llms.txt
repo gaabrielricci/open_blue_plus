@@ -1,0 +1,80 @@
+# open_blue_plus
+
+> Bluetooth Low Energy (central role) plugin for Flutter on Android, iOS, macOS, Web, Linux and Windows. MIT licensed. Import `package:open_blue_plus/open_blue_plus.dart`. Entry point: `BleManager.instance`. This file is a compact reference for AI coding assistants.
+
+IMPORTANT for code generation: this is NOT flutter_blue_plus. Do not use `FlutterBluePlus`, `BluetoothDevice`, `Guid`, `DeviceIdentifier`, `setNotifyValue`, `onValueReceived` or `int` timeouts here. Use the names below.
+
+## Rules
+
+- Get the manager once: `final ble = BleManager.instance;`
+- Before scanning: `if (!await ble.requestPermissions()) return;` then `await ble.waitUntilOn();`
+- UUIDs: `BleUuid('180d')` (16/32/128-bit strings, any case). Compare with `==`.
+- Timeouts are `Duration`s.
+- After every `connect()` call `discoverServices()` before any read/write/notify. Services are cleared on disconnect and when `device.onServicesReset` fires.
+- Subscribe to `characteristic.onValue` BEFORE `await characteristic.setNotify(true)`. Re-enable notifications after every reconnection.
+- Writes without response must fit in `device.mtu - 3` bytes (else `invalid_argument`); split data in chunks. Writes with response accept up to 512 bytes.
+- `connect()` already requests MTU 512 (pass `mtu: null` to skip).
+- All failures are `BleException` with a string `code`: timeout, permission_denied, adapter_off, location_services_off, not_connected, connect_failed, not_found, not_supported, gatt_error (see `status`), bond_failed, busy, unavailable, invalid_argument, no_activity.
+- Web: `startScan` opens the browser chooser, must be called from a button tap, returns one device; pass every service you will use in `withServices` or `webOptionalServices`.
+- iOS/macOS: `createBond`/`removeBond` throw `not_supported` (the OS pairs on first encrypted access). Device ids are UUIDs, not MACs.
+- Call `ble.setOptions(...)` (iOS options) first thing in `main`, before any other Bluetooth call.
+
+## Manager (`BleManager.instance`)
+
+- Adapter: `Stream<AdapterState> adapterState`, `AdapterState adapterStateNow`, `Future<AdapterState> getAdapterState()`, `Future<bool> isSupported`, `Future<String> adapterName`, `Future<bool> requestPermissions({bool androidFineLocation = false})`, `Future<bool> turnOn()`, `Future<bool> turnOff()`, `Future<void> waitUntilOn({Duration timeout})`.
+- `AdapterState`: unknown, unavailable, unauthorized, turningOn, on, turningOff, off.
+- Scan: `Future<void> startScan({List<BleUuid> withServices, List<String> withNames, List<String> withKeywords, List<String> withRemoteIds, List<ManufacturerDataFilter> withManufacturerData, List<ServiceDataFilter> withServiceData, String? withNamePrefix, Duration? timeout, bool allowDuplicates = false, int continuousDivisor = 1, Duration? removeIfGone, AndroidScanMode androidScanMode, bool androidLegacy = false, bool androidCheckLocationServices = true, List<BleUuid> webOptionalServices})`. List filters are OR-combined; `withNamePrefix` is AND-ed. `removeIfGone` requires `allowDuplicates`.
+- `Future<void> stopScan()`, `Stream<List<ScanResult>> scanResults` (deduplicated, sorted by RSSI, emits current list on listen), `Stream<List<ScanResult>> onScanResults` (empty when not scanning), `Stream<ScanResult> onScanResult` (every advertisement), `List<ScanResult> lastScanResults`, `Stream<bool> isScanning`, `bool isScanningNow`, `void cancelWhenScanComplete(StreamSubscription sub)`.
+- `ManufacturerDataFilter(int companyId, {List<int> data, List<int>? mask})`, `ServiceDataFilter(BleUuid service, {List<int> data, List<int>? mask})`: payload starts with `data` under `mask`.
+- `ScanResult`: `BleDevice device`, `int rssi`, `AdvertisementData advertisement`, `DateTime timestamp`.
+- `AdvertisementData`: `String? localName`, `int? txPowerLevel`, `bool connectable`, `Map<int, Uint8List> manufacturerData` (company id -> payload without the id), `Map<BleUuid, Uint8List> serviceData`, `List<BleUuid> serviceUuids`.
+- Devices: `Future<List<BleDevice>> connectedDevices()`, `List<BleDevice> connectedDevicesNow`, `Future<List<BleDevice>> systemDevices([List<BleUuid> withServices])`, `Future<List<BleDevice>> bondedDevices()`.
+- Other: `Future<PhySupport> getPhySupport()`, `Future<bool> setOptions({bool showPowerAlert = false, bool restoreState = false, String restoreIdentifier})`, `Future<void> setLogLevel(BleLogLevel level, {bool print = true})`, `Stream<BleLogRecord> logs`, `BleEvents events`.
+
+## Device (`BleDevice`)
+
+- `BleDevice.fromId(String id)`; `String id`, `String? name`, `String? advName`.
+- `Future<void> connect({Duration? timeout /* 15 s */, bool autoConnect = false, int? mtu = 512})`, `Future<void> disconnect({Duration timeout})`.
+- `Stream<DeviceConnectionState> connectionState` (disconnected, connecting, connected, disconnecting; emits current on listen), `DeviceConnectionState state`, `bool isConnected`, `bool isDisconnected`, `DisconnectReason? disconnectReason` (`int? code`, `String? description`), `bool isAutoConnectEnabled`.
+- `Future<List<BleService>> discoverServices({Duration timeout})`, `List<BleService> services`, `BleService? service(BleUuid uuid)`, `Stream<void> onServicesReset`, `Future<void> clearGattCache()`.
+- `int mtu`, `Stream<int> onMtu`, `Future<int> requestMtu(int mtu)`, `Future<int> readRssi()`, `Future<void> requestConnectionPriority(ConnectionPriority p)` (balanced, high, lowPower; Android).
+- `Future<void> setPreferredPhy({required Set<BlePhy> tx, required Set<BlePhy> rx, PhyCodedOption codedOption})` (BlePhy.le1m, le2m, leCoded; Android), `PhyUpdate? phyNow`, `Stream<PhyUpdate> onPhyChanged`.
+- Pairing: `Future<BondState> bondState()`, `BondState? bondStateNow`, `BondState? prevBondState`, `Stream<BondState> onBondState`, `Future<void> createBond({String? pin, Duration timeout})`, `Future<void> removeBond()`. `BondState`: none, bonding, bonded, unknown.
+- `void cancelWhenDisconnected(StreamSubscription sub, {bool next = false})`.
+
+## GATT
+
+- `BleService`: `BleUuid uuid`, `bool isPrimary`, `bool isSecondary`, `int index` (nth service with this UUID), `List<BleCharacteristic> characteristics`, `List<BleService> includedServices`, `BleCharacteristic? characteristic(BleUuid uuid)` (first match).
+- `BleCharacteristic`: `BleUuid uuid`, `int index`, `CharacteristicProperties properties` (read, write, writeWithoutResponse, notify, indicate, broadcast, authenticatedSignedWrites, extendedProperties), `Future<Uint8List> read({Duration timeout})`, `Future<void> write(List<int> value, {bool withoutResponse = false, Duration timeout})`, `Future<void> setNotify(bool enable, {bool forceIndications = false, Duration timeout})`, `bool isNotifying`, `Uint8List? lastValue`, `Stream<Uint8List> onValue` (reads + notifications), `Stream<Uint8List> lastValueStream`, `List<BleDescriptor> descriptors`, `BleDescriptor? descriptor(BleUuid uuid)`.
+- `BleDescriptor`: `BleUuid uuid`, `Future<Uint8List> read()`, `Future<void> write(List<int>)`, `Uint8List? lastValue`, `Stream<Uint8List> onValue`. `BleUuids.cccd` = 0x2902 (prefer `setNotify`).
+
+## Global events (`ble.events`)
+
+onConnectionStateChanged (BleConnectionEvent: device, state, reason), onMtuChanged, onCharacteristicValue (BleValueEvent), onCharacteristicWritten, onDescriptorValue, onBondStateChanged, onNameChanged, onServicesReset, onPhyChanged.
+
+## Minimal example
+
+```dart
+final ble = BleManager.instance;
+if (!await ble.requestPermissions()) return;
+await ble.waitUntilOn();
+final first = ble.onScanResult.first;
+await ble.startScan(withServices: [BleUuid('180d')], timeout: const Duration(seconds: 15));
+final device = (await first).device;
+await ble.stopScan();
+await device.connect();
+await device.discoverServices();
+final hr = device.service(BleUuid('180d'))!.characteristic(BleUuid('2a37'))!;
+final sub = hr.onValue.listen((bytes) => print(bytes));
+device.cancelWhenDisconnected(sub);
+await hr.setNotify(true);
+```
+
+## Docs
+
+- [README](https://github.com/gaabrielricci/open_blue_plus/blob/main/README.md): setup per platform and usage
+- [Recipes](https://github.com/gaabrielricci/open_blue_plus/tree/main/example/lib/recipes): heart rate, battery, iBeacon scanner, UART terminal, auto reconnect, pairing
+- [Testing with a fake backend](https://github.com/gaabrielricci/open_blue_plus/blob/main/doc/testing.md)
+- [Migration from flutter_blue_plus](https://github.com/gaabrielricci/open_blue_plus/blob/main/doc/migration_from_flutter_blue_plus.md)
+- [Background](https://github.com/gaabrielricci/open_blue_plus/blob/main/doc/background.md) · [Troubleshooting](https://github.com/gaabrielricci/open_blue_plus/blob/main/doc/troubleshooting.md)
+- [Platform protocol](https://github.com/gaabrielricci/open_blue_plus/blob/main/PROTOCOL.md)

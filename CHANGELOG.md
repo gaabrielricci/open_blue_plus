@@ -20,3 +20,7 @@
 * MTU, RSSI, connection priority and PHY (Android).
 * iOS / macOS options: power alert and state restoration.
 * Global event streams (`BleManager.events`) and Dart + native logs.
+* Documentation: complete README, guides (migration from flutter_blue_plus,
+  testing with a fake backend, background operation, troubleshooting, AI
+  assistants), `llms.txt` API reference for AI tools, and example recipes
+  (heart rate, battery, iBeacon, UART, auto reconnect, pairing).
