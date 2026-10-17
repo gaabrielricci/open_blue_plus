@@ -1,0 +1,16 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Declared without maxSdkVersion / usesPermissionFlags on purpose: the
+         manifest merger copies library attributes into the app's own
+         declarations, so restricting them here would silently remove
+         permissions the app relies on (e.g. BLUETOOTH for permission_handler,
+         location for maps) on Android 12+.
+
+         Location is NOT declared here. Apps that support Android 11 and lower
+         must declare ACCESS_FINE_LOCATION themselves (scanning needs it there). -->
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+</manifest>

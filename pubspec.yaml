@@ -1,0 +1,50 @@
+name: open_blue_plus
+description: Bluetooth Low Energy (central role) plugin for Flutter on Android, iOS, macOS, Web, Linux and Windows. Scan, connect, read, write and subscribe to notifications.
+version: 1.0.0
+repository: https://github.com/gaabrielricci/open_blue_plus
+issue_tracker: https://github.com/gaabrielricci/open_blue_plus/issues
+topics:
+  - bluetooth
+  - ble
+  - bluetooth-low-energy
+  - iot
+  - beacon
+
+environment:
+  sdk: ^3.3.0
+  flutter: '>=3.19.0'
+
+dependencies:
+  bluez: '>=0.8.3 <0.10.0'
+  dbus: '>=0.7.11 <0.9.0'
+  flutter:
+    sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
+  web: ^1.1.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.riccimobile.open_blue_plus
+        pluginClass: OpenBluePlusPlugin
+      ios:
+        pluginClass: OpenBluePlusPlugin
+        sharedDarwinSource: true
+      macos:
+        pluginClass: OpenBluePlusPlugin
+        sharedDarwinSource: true
+      web:
+        pluginClass: OpenBluePlusWeb
+        fileName: src/web/web_backend.dart
+      linux:
+        dartPluginClass: OpenBluePlusLinux
+        dartFileName: src/linux/linux_backend.dart
+      windows:
+        pluginClass: OpenBluePlusPluginCApi
