@@ -16,6 +16,34 @@ MIT licensed, no telemetry, no commercial restrictions.
 > packages that came before it; this project is not affiliated with or
 > endorsed by any of them.
 
+> [!NOTE]
+> **Built with AI assistance.** This package was written with the help of AI
+> coding assistants and reviewed and tested by its maintainers. Bluetooth
+> stacks change with every OS release, so
+> [contributions](#contributing) are very welcome: bug reports, fixes,
+> device-specific findings and platform updates keep the project current and
+> working.
+
+## 🤖 Implementing with an AI assistant? Start here
+
+Most AI assistants learned Flutter Bluetooth from *flutter_blue_plus* and will
+generate its API (`FlutterBluePlus.startScan`, `Guid(...)`) for this package.
+Give them [`llms.txt`](llms.txt), a compact reference of the whole API and the
+rules that matter, before they write any Bluetooth code. Paste this into your
+app's `CLAUDE.md`, `.cursor/rules/bluetooth.mdc` or
+`.github/copilot-instructions.md`:
+
+```markdown
+## Bluetooth
+This app uses `open_blue_plus` for Bluetooth (NOT flutter_blue_plus).
+Before writing Bluetooth code, read the API reference:
+https://raw.githubusercontent.com/gaabrielricci/open_blue_plus/main/llms.txt
+```
+
+Then follow the [AI integration guide](doc/ai_integration.md): setup for each
+tool, ready-made prompts (scanner screen, device protocol, large transfers,
+tests, migration) and a checklist to review the generated code.
+
 ## Contents
 
 - [Features](#features)
@@ -32,6 +60,7 @@ MIT licensed, no telemetry, no commercial restrictions.
 - [Testing your app](#testing-your-app)
 - [More documentation](#more-documentation)
 - [FAQ](#faq)
+- [Contributing](#contributing)
 
 ## Features
 
@@ -406,20 +435,8 @@ The [example app](example/lib/main.dart) is a complete BLE explorer
 
 ## Using AI assistants
 
-The package ships [`llms.txt`](llms.txt), a compact API reference for AI
-coding assistants. Point your assistant at it so it doesn't confuse this
-API with other Bluetooth packages:
-
-```markdown
-<!-- CLAUDE.md, .cursor/rules, .github/copilot-instructions.md -->
-This app uses `open_blue_plus` for Bluetooth (not flutter_blue_plus).
-Read https://raw.githubusercontent.com/gaabrielricci/open_blue_plus/main/llms.txt
-before writing Bluetooth code.
-```
-
-The [AI integration guide](doc/ai_integration.md) has ready-made prompts
-(scanner screen, device protocol, large transfers, tests, migration) and a
-checklist to review generated code.
+See [Implementing with an AI assistant](#-implementing-with-an-ai-assistant-start-here)
+at the top of this page and the [AI integration guide](doc/ai_integration.md).
 
 ## Testing your app
 
@@ -466,6 +483,23 @@ Android 12+.
 See [troubleshooting](doc/troubleshooting.md), then open an
 [issue](https://github.com/gaabrielricci/open_blue_plus/issues) with the
 debug logs (`setLogLevel(BleLogLevel.debug)`), platform and device models.
+
+## Contributing
+
+open_blue_plus is built with AI assistance and maintained by the community.
+Contributions of any size are welcome:
+
+* **Report problems**: open an
+  [issue](https://github.com/gaabrielricci/open_blue_plus/issues) with the
+  platform, OS version, device models and debug logs.
+* **Fix and improve**: pull requests for bugs, new OS versions, platform
+  features and documentation. AI-assisted contributions are fine, as long as
+  you have tested them and understand the change.
+* **Share device findings**: quirks of specific phones, adapters or
+  peripherals help everyone.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to set up, test and submit a
+change.
 
 ## License
 
