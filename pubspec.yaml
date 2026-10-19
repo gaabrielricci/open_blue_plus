@@ -1,5 +1,5 @@
 name: open_blue_plus
-description: Bluetooth Low Energy (central role) plugin for Flutter on Android, iOS, macOS, Web, Linux and Windows. Scan, connect, read, write and subscribe to notifications.
+description: Free, open-source (MIT) Bluetooth Low Energy plugin for Flutter on Android, iOS, macOS, Web, Linux and Windows. Free for commercial use. Scan, connect, read, write, notify.
 version: 1.0.0
 repository: https://github.com/gaabrielricci/open_blue_plus
 issue_tracker: https://github.com/gaabrielricci/open_blue_plus/issues

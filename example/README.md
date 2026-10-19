@@ -8,7 +8,8 @@
 * device page: connect / disconnect, MTU, bond state, last disconnection
   reason, pair / unpair, read RSSI, clear GATT cache;
 * service browser: read, write (hex) and notify on every characteristic,
-  re-discovery when the peripheral changes its services.
+  re-discovery when the peripheral changes its services;
+* "Print test" (device menu): ESC/POS test page on a BLE thermal printer.
 
 Run it on a phone, a desktop or Chrome:
 
@@ -31,6 +32,7 @@ Small, self-contained snippets for common jobs, in
 | [`uart_terminal.dart`](lib/recipes/uart_terminal.dart) | Nordic UART Service: large MTU, sending data in MTU-sized chunks, text lines |
 | [`auto_reconnect.dart`](lib/recipes/auto_reconnect.dart) | keeping a device connected: `autoConnect`, retries with back-off, re-subscribing after reconnection and services changes |
 | [`pairing.dart`](lib/recipes/pairing.dart) | pairing with an optional PIN on every platform |
+| [`thermal_printer.dart`](lib/recipes/thermal_printer.dart) | BLE thermal receipt printer: finding the print characteristic, ESC/POS test page, paper cut, chunked writes, Web optional services |
 
 ## In five lines
 

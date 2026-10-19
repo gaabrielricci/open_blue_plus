@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:open_blue_plus/open_blue_plus.dart';
 
+import 'recipes/thermal_printer.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Apple options must be set before any other Bluetooth call.
@@ -78,6 +80,8 @@ class _ScanPageState extends State<ScanPage> {
         await ble.startScan(
           withKeywords: keyword.isEmpty ? const [] : [keyword],
           timeout: const Duration(seconds: 15),
+          // Web hides services not declared here (see "Print test").
+          webOptionalServices: printerServices,
         );
       }
     } catch (e) {
@@ -219,6 +223,13 @@ class _DevicePageState extends State<DevicePage> {
           case 'cache':
             await device.clearGattCache();
             await device.discoverServices();
+          case 'print':
+            if (!device.isConnected) {
+              await device.connect();
+              await device.discoverServices();
+            }
+            await printTestPage(device);
+            if (mounted) showError(context, 'Test page sent');
         }
       });
 
@@ -258,6 +269,7 @@ class _DevicePageState extends State<DevicePage> {
               PopupMenuItem(value: 'unpair', child: Text('Unpair')),
               PopupMenuItem(value: 'rssi', child: Text('Read RSSI')),
               PopupMenuItem(value: 'cache', child: Text('Clear GATT cache')),
+              PopupMenuItem(value: 'print', child: Text('Print test')),
             ],
           ),
         ],
