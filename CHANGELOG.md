@@ -1,4 +1,4 @@
-## Unreleased
+## 1.1.0
 
 * Android: Bluetooth Classic printers and other SPP devices. `connect`
   (`transport: auto`, the default) opens an RFCOMM link to Classic-only
