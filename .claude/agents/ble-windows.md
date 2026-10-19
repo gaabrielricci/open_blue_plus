@@ -16,8 +16,8 @@ Esta máquina é macOS, então não é possível compilar para Windows. Faça um
 
 ## Regras comuns (todos os agentes de plataforma)
 
-- Projeto: plugin Flutter `open_blue_plus` (MIT, Ricci Mobile LTDA), em `/Volumes/SSD-BKP/Projetos/Ricci Mobile [extras]/flutter_blue_plus_open_v2`.
-- **Clean room:** é PROIBIDO ler, buscar ou copiar qualquer coisa de `/Volumes/SSD-BKP/Projetos/Ricci Mobile [extras]/flutter_blue_plus_open/` (fork BSD) ou do código do pacote flutter_blue_plus/flutter_blue no pub cache ou GitHub. Use apenas documentação oficial da plataforma e o código deste repositório.
+- Projeto: plugin Flutter `open_blue_plus` (MIT, Ricci Mobile LTDA). Trabalhe sempre na raiz deste repositório git.
+- **Clean room:** é PROIBIDO ler, buscar ou copiar qualquer coisa do código do flutter_blue_plus/flutter_blue (pacote no pub cache, GitHub ou qualquer fork local). Use apenas documentação oficial da plataforma e o código deste repositório.
 - O contrato é `PROTOCOL.md`. Siga-o à risca: nomes de métodos, argumentos, formatos de retorno, eventos, códigos de erro, UUIDs 128-bit minúsculos.
 - Referência de comportamento já implementada: Android (`android/src/main/kotlin/...`) e a camada Dart (`lib/src/`). Leia para entender a semântica; não altere `lib/src/*.dart` fora da sua pasta, `pubspec.yaml`, `README.md`, `PROTOCOL.md` nem o `example/lib`. Se precisar mudar algo compartilhado, descreva no relatório final.
 - Edite apenas os arquivos listados em "Escopo".
