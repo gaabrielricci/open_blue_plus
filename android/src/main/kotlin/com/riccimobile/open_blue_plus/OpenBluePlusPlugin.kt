@@ -51,7 +51,10 @@ class OpenBluePlusPlugin :
     private var pendingPermissionList: List<String> = emptyList()
     private var pendingTurnOn: Result? = null
 
-    private val sessions = HashMap<String, GattSession>()
+    private val sessions = HashMap<String, DeviceSession>()
+    // Bumped by every `disconnect` call, so a fallback to Classic SPP knows the
+    // LE attempt it replaces was cancelled by the app rather than failed.
+    private val disconnectEpochs = HashMap<String, Int>()
     private val log = BleLog(::emit)
     private lateinit var bonds: BondManager
 
@@ -172,6 +175,7 @@ class OpenBluePlusPlugin :
                 "createBond", "removeBond" -> bond(call, result)
                 "connect" -> connect(call, result)
                 "disconnect" -> {
+                    disconnectEpochs.merge(call.id, 1, Int::plus)
                     val s = sessions[call.id]
                     if (s == null) result.success(null) else s.disconnect(result)
                 }
@@ -660,12 +664,84 @@ class OpenBluePlusPlugin :
             result.error("invalid_argument", "Invalid device address: $id", null)
             return
         }
-        val session = sessions.getOrPut(id) {
-            GattSession(context, a.getRemoteDevice(id), handler, ::emit, log) { closed ->
-                if (sessions[closed.id] === closed) sessions.remove(closed.id)
-            }
+        val autoConnect = call.argument<Boolean>("autoConnect") ?: false
+        sessions[id]?.let { return it.connect(autoConnect, result) }
+        val device = a.getRemoteDevice(id)
+        when (chooseTransport(device, call.argument<String>("transport"), autoConnect)) {
+            Transport.LE -> gattSession(device).connect(autoConnect, result)
+            Transport.CLASSIC -> sppSession(a, device).connect(autoConnect, result)
+            Transport.LE_THEN_CLASSIC -> connectWithClassicFallback(a, device, result)
         }
-        session.connect(call.argument<Boolean>("autoConnect") ?: false, result)
+    }
+
+    private enum class Transport { LE, CLASSIC, LE_THEN_CLASSIC }
+
+    /**
+     * `auto` (the default): a Classic-only device can only be reached over SPP;
+     * a paired dual-mode (or unknown-type) device tries LE first and falls back
+     * to SPP. Everything else is LE, as before.
+     *
+     * The cached SDP UUIDs are not consulted: printers seen in the field (MTP-3)
+     * report only their LE services there and still answer RFCOMM. A device
+     * without SPP just fails the fallback fast and `connect` reports the error.
+     */
+    private fun chooseTransport(device: BluetoothDevice, requested: String?, autoConnect: Boolean): Transport {
+        when (requested) {
+            "le" -> return Transport.LE
+            "classic" -> return Transport.CLASSIC
+        }
+        val type = device.type
+        if (type == BluetoothDevice.DEVICE_TYPE_CLASSIC) return Transport.CLASSIC
+        // SPP has no background reconnection, and a fallback to it from an
+        // unpaired device would pop up a pairing dialog the app did not ask for.
+        if (autoConnect || type == BluetoothDevice.DEVICE_TYPE_LE) return Transport.LE
+        if (device.bondState != BluetoothDevice.BOND_BONDED) return Transport.LE
+        return Transport.LE_THEN_CLASSIC
+    }
+
+    private fun gattSession(device: BluetoothDevice) =
+        GattSession(context, device, handler, ::emit, log, ::onSessionClosed).also { sessions[it.id] = it }
+
+    private fun sppSession(a: BluetoothAdapter, device: BluetoothDevice) =
+        SppSession(a, device, handler, ::emit, log, ::onSessionClosed).also { sessions[it.id] = it }
+
+    private fun onSessionClosed(closed: DeviceSession) {
+        if (sessions[closed.id] === closed) sessions.remove(closed.id)
+    }
+
+    /**
+     * Dual-mode printers often have a weak or disabled LE side. LE gets
+     * [LE_FALLBACK_MS] (the Dart timeout keeps running over both attempts);
+     * when it fails, the same `connect` call continues over Classic SPP.
+     */
+    private fun connectWithClassicFallback(a: BluetoothAdapter, device: BluetoothDevice, result: Result) {
+        val id = device.address
+        val epoch = disconnectEpochs[id] ?: 0
+        val gatt = gattSession(device)
+        val giveUp = Runnable { if (!gatt.connected) gatt.close(null, "LE connection timed out") }
+        handler.postDelayed(giveUp, LE_FALLBACK_MS)
+        gatt.connect(false, object : Result {
+            override fun success(value: Any?) {
+                handler.removeCallbacks(giveUp)
+                result.success(value)
+            }
+
+            override fun error(code: String, message: String?, details: Any?) {
+                handler.removeCallbacks(giveUp)
+                val cancelled = (disconnectEpochs[id] ?: 0) != epoch
+                if (code != "connect_failed" || cancelled || !a.isEnabled || sessions[id]?.connected == true) {
+                    result.error(code, message, details)
+                    return
+                }
+                log.log(BleLog.INFO) { "LE connect to $id failed ($message): trying Classic SPP" }
+                sppSession(a, device).connect(false, result)
+            }
+
+            override fun notImplemented() {
+                handler.removeCallbacks(giveUp)
+                result.notImplemented()
+            }
+        })
     }
 
     // ---- bonding ------------------------------------------------------------
@@ -716,12 +792,8 @@ class OpenBluePlusPlugin :
             result.success(emptyList<Any>())
             return
         }
-        // Classic-only devices cannot be reached over GATT, so they are left out.
-        result.success(
-            a.bondedDevices.orEmpty()
-                .filter { it.type != BluetoothDevice.DEVICE_TYPE_CLASSIC }
-                .map { mapOf("id" to it.address, "name" to it.name) }
-        )
+        // Classic-only devices included: connect reaches them over SPP.
+        result.success(a.bondedDevices.orEmpty().map { mapOf("id" to it.address, "name" to it.name) })
     }
 
     private fun getBondState(call: MethodCall, result: Result) {
@@ -745,7 +817,7 @@ class OpenBluePlusPlugin :
         else -> null
     }
 
-    private fun safeName(s: GattSession): String? = try {
+    private fun safeName(s: DeviceSession): String? = try {
         s.device.name
     } catch (_: SecurityException) {
         null
@@ -753,6 +825,7 @@ class OpenBluePlusPlugin :
 
     companion object {
         private const val BOND_TIMEOUT_MS = 30_000L
+        private const val LE_FALLBACK_MS = 5_000L
         private const val MAX_SCAN_STARTS = 5
         private const val SCAN_WINDOW_MS = 30_000L
         // ScanCallback constants added after minSdk (API 26 / 33).

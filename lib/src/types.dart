@@ -32,6 +32,18 @@ enum AdapterState {
 }
 
 /// Connection state of a [BleDevice].
+/// How [BleDevice.connect] reaches a device (Android; see its `transport`).
+enum BleTransport {
+  /// LE, or Bluetooth Classic SPP when the device needs it.
+  auto,
+
+  /// Bluetooth Low Energy (GATT) only.
+  le,
+
+  /// Bluetooth Classic, Serial Port Profile (RFCOMM). Android only.
+  classic,
+}
+
 enum DeviceConnectionState {
   /// Not connected.
   disconnected,

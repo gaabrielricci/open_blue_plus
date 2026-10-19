@@ -1,3 +1,13 @@
+## Unreleased
+
+* Android: Bluetooth Classic printers and other SPP devices. `connect`
+  (`transport: auto`, the default) opens an RFCOMM link to Classic-only
+  devices, and falls back to it from LE for paired dual-mode ones; the link is
+  exposed as service/characteristic `0x1101` (`BleUuids.serialPort`), so code
+  written for LE printers works unchanged. `BleDevice.transport` tells which
+  one was used; `BleTransport.le` / `.classic` force it.
+* Android: `bondedDevices()` now lists Classic-only devices.
+
 ## 1.0.0
 
 * First release: central role on Android, iOS, macOS, Web, Linux and Windows.
