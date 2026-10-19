@@ -23,4 +23,5 @@
 * Documentation: complete README, guides (migration from flutter_blue_plus,
   testing with a fake backend, background operation, troubleshooting, AI
   assistants), `llms.txt` API reference for AI tools, and example recipes
-  (heart rate, battery, iBeacon, UART, auto reconnect, pairing).
+  (heart rate, battery, iBeacon, UART, auto reconnect, pairing, thermal
+  receipt printer with ESC/POS and paper cut).

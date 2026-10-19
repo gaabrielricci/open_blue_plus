@@ -8,7 +8,8 @@ Web, Linux and Windows**. Scan, connect, read, write, subscribe to
 notifications, pair, and more, with one API that behaves the same on every
 platform.
 
-MIT licensed, no telemetry, no commercial restrictions.
+**Free and open source (MIT), free for commercial use**: no license fees,
+no paid tiers, no telemetry.
 
 > Independent implementation written from scratch on top of the official
 > platform APIs (Android Bluetooth LE, CoreBluetooth, Web Bluetooth, BlueZ,
@@ -429,6 +430,9 @@ Ready-to-adapt code in [`example/lib/recipes/`](example/lib/recipes):
 * [Keep connected](example/lib/recipes/auto_reconnect.dart): auto connect,
   retries, re-subscribing.
 * [Pairing](example/lib/recipes/pairing.dart): PIN, every platform.
+* [Thermal receipt printer](example/lib/recipes/thermal_printer.dart):
+  ESC/POS test page with paper cut on BLE printers (MTP, PT-210,
+  Xprinter...), including Web.
 
 The [example app](example/lib/main.dart) is a complete BLE explorer
 (scanner, device page, service browser).
@@ -461,6 +465,16 @@ See [doc/testing.md](doc/testing.md) for a complete fake you can copy.
 * [API reference](https://pub.dev/documentation/open_blue_plus/latest/)
 
 ## FAQ
+
+**Is it free for commercial apps?**
+Yes. MIT license: use it in closed-source and commercial apps, no fees, no
+registration.
+
+**Can it print on Bluetooth thermal printers?**
+Yes, BLE printers: the package sends the bytes, your app (or an ESC/POS
+package) builds them. See the
+[thermal printer recipe](example/lib/recipes/thermal_printer.dart).
+Classic Bluetooth (SPP) printers are not supported.
 
 **Does it support the peripheral role (advertising, GATT server)?**
 No, central role only.
