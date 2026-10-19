@@ -474,7 +474,9 @@ registration.
 Yes, BLE printers: the package sends the bytes, your app (or an ESC/POS
 package) builds them. See the
 [thermal printer recipe](example/lib/recipes/thermal_printer.dart).
-Classic Bluetooth (SPP) printers are not supported.
+On Android, Classic Bluetooth (SPP) printers work too, with the same code:
+`connect` opens the serial link and exposes it as one writable characteristic
+(`BleUuids.serialPort`). iOS cannot open SPP without MFi certification.
 
 **Does it support the peripheral role (advertising, GATT server)?**
 No, central role only.
@@ -483,7 +485,8 @@ No, central role only.
 Yes. Phones usually allow 4 to 7 simultaneous connections.
 
 **Classic Bluetooth (serial, audio)?**
-No, Bluetooth Low Energy only.
+Serial (SPP) on Android only, for printers and similar devices (see above).
+No audio or other Classic profiles.
 
 **Why is the device id different on iPhone?**
 iOS and macOS hide MAC addresses; ids are per-phone UUIDs. Save them per

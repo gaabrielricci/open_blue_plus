@@ -159,11 +159,11 @@ Other `startScan` arguments:
 | `stopScan` | – | `null` |
 | `getConnectedDevices` | – | `List<Map>` of `{id, name}` |
 | `getSystemDevices` | `services: List<String>` | `List<Map>` of `{id, name}`: LE devices currently connected to the OS by **any** app. Apple requires services (`retrieveConnectedPeripherals`; empty list → `[00001800-…]`); Android ignores them (`BluetoothManager.getConnectedDevices(GATT)`); Linux: `Connected` devices, filtered by `UUIDs` when services given; Windows: connected LE devices; Web: `[]`. The app must still call `connect`. |
-| `getBondedDevices` | – | `List<Map>` of `{id, name}` paired with the system (Android: LE/dual only; Linux: `Paired`; Windows: paired LE devices); `[]` where unsupported |
+| `getBondedDevices` | – | `List<Map>` of `{id, name}` paired with the system (Android: every paired device, Classic-only included, since `connect` reaches them over SPP; Linux: `Paired`; Windows: paired LE devices); `[]` where unsupported |
 | `getBondState` | `id` | `String`: `none` `bonding` `bonded` `unknown` (`unknown` where unsupported) |
 | `createBond` | `id`, `pin: String?`, `timeoutMs: int` | `null` once bonded (immediately if already bonded). `pin`: digits supplied automatically when the peripheral asks for a passkey/PIN. Failure/rejection → `bond_failed`; Apple/Web → `not_supported`. Works connected or not (Android/Windows). |
 | `removeBond` | `id` | `null` once unpaired (succeeds if not bonded). Apple/Web → `not_supported`. Android uses the hidden `removeBond` API; if blocked → `not_supported`. |
-| `connect` | `id`, `autoConnect: bool` | `null` once connected; error `connect_failed` otherwise. No timeout natively (Dart applies it and calls `disconnect`). |
+| `connect` | `id`, `autoConnect: bool`, `transport: String` (`auto` `le` `classic`) | Once connected: `"le"` or `"classic"` (Android), `null` elsewhere (read as LE); error `connect_failed` otherwise. No timeout natively (Dart applies it and calls `disconnect`). Only Android honours `transport`, see [Classic SPP on Android](#classic-spp-on-android). |
 | `disconnect` | `id` | `null` once disconnected. Must also cancel a pending connect. Succeeds if unknown/not connected. |
 | `discoverServices` | `id` | `List<Map>` (see below) |
 | `clearGattCache` | `id` | `null`. Android: `BluetoothGatt.refresh()` (hidden API; `not_connected` without a GATT, `not_supported` if blocked). Windows: next `discoverServices` uses `Uncached`. Others: no-op. Call `discoverServices` afterwards. |
@@ -244,3 +244,31 @@ permission prompt. With `restoreState`, the OS may relaunch the app in the
 background and hand back connected peripherals (`willRestoreState`); they are
 reported by `getConnectedDevices` and keep emitting events. Requires the
 `bluetooth-central` background mode.
+
+## Classic SPP on Android
+
+Many thermal printers have no LE radio, so GATT never reaches them. On Android
+`connect` can open the Serial Port Profile (RFCOMM, UUID `0x1101`) instead and
+present it through the same methods:
+
+- **Choice (`transport: auto`).** Classic-only device (`DEVICE_TYPE_CLASSIC`)
+  → SPP. Paired dual-mode or unknown-type device, without `autoConnect` → LE
+  for up to 5 s, then
+  SPP in the same `connect` call if LE failed and the app did not cancel.
+  Anything else → LE. `le` / `classic` force one.
+- **Socket.** Discovery is cancelled first; then secure, insecure and
+  channel-1 RFCOMM sockets are tried in that order.
+- **Attributes.** `discoverServices` returns one primary service `0x1101`
+  with one characteristic `0x1101` (properties `0x1C`: write, write without
+  response, notify; descriptor CCCD). Other addresses → `not_found`.
+- **`write`** (with or without response) sends the bytes to the socket, in
+  order, and completes once the stack accepted them. `mtu` is reported as 515
+  right after connecting and by `requestMtu`, so 512-byte chunks fit.
+- **`setNotify(true)`** turns the bytes the device sends into `value` events
+  (CCCD read/write behave as for GATT). `read` and `readRssi` →
+  `not_supported`; connection priority, PHY and `clearGattCache` are no-ops.
+- **`disconnect`** waits for the accepted writes and a short drain
+  (300 ms + 1 ms per 8 bytes of the burst, at most 3 s) before closing the
+  socket, so the end of a print job is not dropped.
+- A read or write error on the socket ends the session: `connectionState`
+  false, pending calls fail with `not_connected`.

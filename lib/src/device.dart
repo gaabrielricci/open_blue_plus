@@ -31,6 +31,7 @@ class BleDevice {
   PhyUpdate? _phy;
   bool _autoConnect = false;
   int? _autoConnectMtu;
+  BleTransport? _transport;
 
   /// Incremented by every [connect] attempt and every [disconnect], so a
   /// pending attempt knows it was superseded.
@@ -99,6 +100,11 @@ class BleDevice {
   /// been called since.
   bool get isAutoConnectEnabled => _autoConnect;
 
+  /// Transport of the last successful [connect]: [BleTransport.classic] when
+  /// Android reached the device over Bluetooth Classic SPP, otherwise
+  /// [BleTransport.le]. Null before the first connection.
+  BleTransport? get transport => _transport;
+
   /// Connects to the device.
   ///
   /// Fails with a `timeout` [BleException] if the connection is not
@@ -116,11 +122,20 @@ class BleDevice {
   /// A failed MTU request does not fail the connection. With [autoConnect]
   /// it is requested again after every automatic reconnection.
   ///
+  /// [transport] (Android): with [BleTransport.auto], a device that only has
+  /// Bluetooth Classic, such as most cheap thermal printers, is reached over
+  /// the Serial Port Profile and exposed as one service with one writable,
+  /// notifying characteristic ([BleUuids.serialPort]); a paired dual-mode
+  /// device with an SPP record tries LE first and falls back to SPP. Use
+  /// [BleTransport.le] or [BleTransport.classic] to force one. Ignored on
+  /// other platforms (iOS/macOS cannot open SPP without MFi).
+  ///
   /// Concurrent calls share the attempt in flight (and its arguments).
   Future<void> connect({
     Duration? timeout,
     bool autoConnect = false,
     int? mtu = 512,
+    BleTransport transport = BleTransport.auto,
   }) {
     final pending = _connecting;
     if (pending != null) return pending;
@@ -130,6 +145,7 @@ class BleDevice {
       timeout ?? (autoConnect ? null : const Duration(seconds: 15)),
       autoConnect,
       mtu,
+      transport,
     ).whenComplete(() {
       // disconnect() may have dropped this attempt and a new one started.
       if (identical(_connecting, attempt)) _connecting = null;
@@ -140,17 +156,20 @@ class BleDevice {
   Future<void>? _connecting;
   Future<List<BleService>>? _discovering;
 
-  Future<void> _connect(Duration? timeout, bool autoConnect, int? mtu) async {
+  Future<void> _connect(Duration? timeout, bool autoConnect, int? mtu,
+      BleTransport transport) async {
     final attempt = ++_attempt;
     _autoConnect = autoConnect;
     _autoConnectMtu = autoConnect ? mtu : null;
     _setState(DeviceConnectionState.connecting);
+    Object? used;
     try {
-      final f = BleChannel.invoke<void>('connect', {
+      final f = BleChannel.invoke<Object?>('connect', {
         'id': id,
         'autoConnect': autoConnect,
+        'transport': transport.name,
       });
-      await (timeout == null ? f : f.timeout(timeout));
+      used = await (timeout == null ? f : f.timeout(timeout));
     } on TimeoutException {
       if (attempt != _attempt) throw _cancelled;
       await _cancelQuietly();
@@ -168,6 +187,7 @@ class BleDevice {
     }
     // disconnect() was called while this attempt was pending.
     if (attempt != _attempt) throw _cancelled;
+    _transport = used == 'classic' ? BleTransport.classic : BleTransport.le;
     _setState(DeviceConnectionState.connected);
     if (mtu != null) await _requestMtuQuietly(mtu);
   }

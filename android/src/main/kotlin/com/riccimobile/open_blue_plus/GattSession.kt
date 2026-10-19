@@ -31,12 +31,12 @@ import java.util.UUID
 @SuppressLint("MissingPermission")
 internal class GattSession(
     private val context: Context,
-    val device: BluetoothDevice,
+    override val device: BluetoothDevice,
     private val handler: Handler,
     private val emit: (Map<String, Any?>) -> Unit,
     private val log: BleLog,
     private val onClosed: (GattSession) -> Unit,
-) {
+) : DeviceSession {
     private enum class State { IDLE, CONNECTING, CONNECTED, DISCONNECTING, CLOSED }
 
     private sealed class Start {
@@ -76,15 +76,17 @@ internal class GattSession(
     private var services: List<BluetoothGattService> = emptyList()
     private var addresses = IdentityHashMap<BluetoothGattCharacteristic, Address>()
 
-    val connected: Boolean get() = state == State.CONNECTED
+    override val connected: Boolean get() = state == State.CONNECTED
 
-    val id: String get() = device.address
+    override val id: String get() = device.address
+
+    override val transport: String get() = "le"
 
     // ---- connection ---------------------------------------------------------
 
-    fun connect(autoConnect: Boolean, result: Result) {
+    override fun connect(autoConnect: Boolean, result: Result) {
         when (state) {
-            State.CONNECTED -> return result.success(null)
+            State.CONNECTED -> return result.success(transport)
             State.CONNECTING -> return result.error("busy", "A connection attempt is already in progress", null)
             State.DISCONNECTING -> return result.error("busy", "A disconnection is in progress", null)
             State.CLOSED -> return result.error("connect_failed", "Session closed", null)
@@ -106,7 +108,7 @@ internal class GattSession(
         state = State.CONNECTING
     }
 
-    fun disconnect(result: Result) {
+    override fun disconnect(result: Result) {
         val g = gatt
         when (state) {
             State.IDLE, State.CLOSED -> result.success(null)
@@ -133,7 +135,7 @@ internal class GattSession(
     }
 
     /** Releases the BluetoothGatt and completes every pending request. */
-    fun close(status: Int?, reason: String) {
+    override fun close(status: Int?, reason: String) {
         if (state == State.CLOSED) return
         val wasConnected = state == State.CONNECTED || state == State.DISCONNECTING
         state = State.CLOSED
@@ -174,16 +176,16 @@ internal class GattSession(
 
     // ---- GATT requests ------------------------------------------------------
 
-    fun discoverServices(timeoutMs: Long?, result: Result) = enqueue("discover", timeoutMs, result) { g ->
+    override fun discoverServices(timeoutMs: Long?, result: Result) = enqueue("discover", timeoutMs, result) { g ->
         if (g.discoverServices()) Start.Pending() else Start.Fail("gatt_error", "discoverServices failed to start")
     }
 
-    fun read(t: Target, timeoutMs: Long?, result: Result) = enqueue("read", timeoutMs, result) { g ->
+    override fun read(t: Target, timeoutMs: Long?, result: Result) = enqueue("read", timeoutMs, result) { g ->
         val c = findCharacteristic(g, t) ?: return@enqueue notFound("characteristic", t.characteristic)
         if (g.readCharacteristic(c)) Start.Pending(key(c)) else Start.Fail("gatt_error", "readCharacteristic failed to start")
     }
 
-    fun write(t: Target, value: ByteArray, withoutResponse: Boolean, timeoutMs: Long?, result: Result) =
+    override fun write(t: Target, value: ByteArray, withoutResponse: Boolean, timeoutMs: Long?, result: Result) =
         enqueue("write", timeoutMs, result) { g ->
             val c = findCharacteristic(g, t) ?: return@enqueue notFound("characteristic", t.characteristic)
             val type = if (withoutResponse) BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
@@ -203,7 +205,7 @@ internal class GattSession(
             }
         }
 
-    fun setNotify(t: Target, enable: Boolean, forceIndications: Boolean, timeoutMs: Long?, result: Result) =
+    override fun setNotify(t: Target, enable: Boolean, forceIndications: Boolean, timeoutMs: Long?, result: Result) =
         enqueue("descriptorWrite", timeoutMs, result) { g ->
             val c = findCharacteristic(g, t) ?: return@enqueue notFound("characteristic", t.characteristic)
             startNotify(g, c, enable, forceIndications)
@@ -231,14 +233,14 @@ internal class GattSession(
         return writeDescriptorCompat(g, cccd, value)
     }
 
-    fun readDescriptor(t: Target, descriptor: String, timeoutMs: Long?, result: Result) =
+    override fun readDescriptor(t: Target, descriptor: String, timeoutMs: Long?, result: Result) =
         enqueue("descriptorRead", timeoutMs, result) { g ->
             val d = findCharacteristic(g, t)?.getDescriptor(UUID.fromString(descriptor))
                 ?: return@enqueue notFound("descriptor", descriptor)
             if (g.readDescriptor(d)) Start.Pending(key(d)) else Start.Fail("gatt_error", "readDescriptor failed to start")
         }
 
-    fun writeDescriptor(t: Target, descriptor: String, value: ByteArray, timeoutMs: Long?, result: Result) =
+    override fun writeDescriptor(t: Target, descriptor: String, value: ByteArray, timeoutMs: Long?, result: Result) =
         enqueue("descriptorWrite", timeoutMs, result) { g ->
             val d = findCharacteristic(g, t)?.getDescriptor(UUID.fromString(descriptor))
                 ?: return@enqueue notFound("descriptor", descriptor)
@@ -251,11 +253,11 @@ internal class GattSession(
             }
         }
 
-    fun requestMtu(mtu: Int, timeoutMs: Long?, result: Result) = enqueue("mtu", timeoutMs, result) { g ->
+    override fun requestMtu(mtu: Int, timeoutMs: Long?, result: Result) = enqueue("mtu", timeoutMs, result) { g ->
         if (g.requestMtu(mtu)) Start.Pending() else Start.Fail("gatt_error", "requestMtu failed to start")
     }
 
-    fun readRssi(timeoutMs: Long?, result: Result) = enqueue("rssi", timeoutMs, result) { g ->
+    override fun readRssi(timeoutMs: Long?, result: Result) = enqueue("rssi", timeoutMs, result) { g ->
         if (g.readRemoteRssi()) Start.Pending() else Start.Fail("gatt_error", "readRemoteRssi failed to start")
     }
 
@@ -264,7 +266,7 @@ internal class GattSession(
      * discoverServices reads the database from the peripheral again. Queued so it
      * never runs in the middle of another request.
      */
-    fun clearGattCache(timeoutMs: Long?, result: Result) = enqueue("refresh", timeoutMs, result) { g ->
+    override fun clearGattCache(timeoutMs: Long?, result: Result) = enqueue("refresh", timeoutMs, result) { g ->
         val ok = try {
             g.javaClass.getMethod("refresh").invoke(g) as? Boolean ?: false
         } catch (e: InvocationTargetException) {
@@ -278,7 +280,7 @@ internal class GattSession(
     }
 
     /** Not queued: the result arrives later as onPhyUpdate (a `phy` event). */
-    fun setPreferredPhy(tx: Int, rx: Int, codedOption: Int, result: Result) {
+    override fun setPreferredPhy(tx: Int, rx: Int, codedOption: Int, result: Result) {
         val g = gatt
         if (g == null || !connected) return result.error("not_connected", "Device is not connected", null)
         if (Build.VERSION.SDK_INT < 26) return result.success(null)
@@ -294,7 +296,7 @@ internal class GattSession(
     }
 
     /** Not queued: it has no callback and the stack accepts it alongside other requests. */
-    fun requestConnectionPriority(priority: Int, result: Result) {
+    override fun requestConnectionPriority(priority: Int, result: Result) {
         val g = gatt
         if (g == null || !connected) return result.error("not_connected", "Device is not connected", null)
         if (priority !in 0..2) return result.error("invalid_argument", "Unknown connection priority $priority", null)
@@ -319,7 +321,7 @@ internal class GattSession(
         pump()
     }
 
-    fun onBondStateChanged(bondState: Int) {
+    override fun onBondStateChanged(bondState: Int) {
         bonding = bondState == BluetoothDevice.BOND_BONDING
         if (!bonding) pump()
     }
@@ -409,7 +411,7 @@ internal class GattSession(
                 }
                 log.log(BleLog.INFO) { "Connected to $id" }
                 emit(mapOf("type" to "connectionState", "id" to id, "connected" to true))
-                connectResult?.success(null)
+                connectResult?.success(transport)
                 connectResult = null
                 // Reports the initial PHY as a `phy` event; not a queued ATT request.
                 if (Build.VERSION.SDK_INT >= 26) {

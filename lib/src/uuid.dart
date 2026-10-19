@@ -62,4 +62,9 @@ class BleUuids {
 
   /// Client Characteristic Configuration Descriptor.
   static final BleUuid cccd = BleUuid.short(0x2902);
+
+  /// Serial Port Profile (0x1101): on Android, the service and the
+  /// characteristic that carry a Bluetooth Classic SPP link (see
+  /// `BleDevice.connect`, `transport`).
+  static final BleUuid serialPort = BleUuid.short(0x1101);
 }
